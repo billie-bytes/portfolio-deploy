@@ -221,6 +221,21 @@ function renderClock() {
     if (clockEl) clockEl.innerHTML = html;
 }
 
+function waitForClock() {
+    return new Promise((resolve) => {
+        const check = () => {
+            const clockEl = document.getElementById('digital-clock-vertical');
+            if (clockEl && clockEl.innerHTML.trim().length > 0 && clockEl.clientHeight > 0) {
+                resolve();
+            } else {
+                // Not ready yet, check again in the next animation frame
+                requestAnimationFrame(check);
+            }
+        };
+        check();
+    });
+}
+
 
 // MAIN INTERACTIVE TERMINAL LOGIC
 
@@ -338,6 +353,8 @@ async function boot() {
         
 
         Module._exec_cmd = exports.exec_cmd;
+        loadingStatus.textContent = "LOADING ASSETS...";
+        await bgPromise;
 
         // Initialize System Data
         init_system();
@@ -357,9 +374,10 @@ async function boot() {
         }, 50);
         setInterval(renderClock, 1000);
         setInterval(updateUptime, 1000);
+        
+        await waitForClock();
 
-        loadingStatus.textContent = "LOADING ASSETS...";
-        await bgPromise;
+        
         loadingStatus.textContent = "BOOT COMPLETE.";
         setTimeout(() => {
             loadingScreen.style.opacity = '0';
