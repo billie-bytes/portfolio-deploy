@@ -15,9 +15,11 @@ const commandHistory = [];
 let historyIndex = -1;
 
 
-const memoryPanel = document.getElementById('status-panel-2'); // Your 3rd panel
+const memoryPanel = document.getElementById('status-panel-2'); // 3rd panel
 
 
+const loadingScreen = document.getElementById('loading-screen');
+const loadingStatus = document.getElementById('loading-status');
 
 
 // WASM MEMORY UTILS
@@ -74,6 +76,20 @@ function parseAnsiColors(str) {
 }
 
 // SYSTEM STATS UPDATING
+
+function waitForBackground() {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.src = 'background.jpg';
+        
+        if (img.complete) {
+            resolve();
+        } else {
+            img.onload = resolve;
+            img.onerror = resolve;
+        }
+    });
+}
 
 function updateUptime() {
     const uptimeMilliseconds = performance.now();
@@ -289,8 +305,16 @@ document.getElementById('terminal-main').addEventListener('click', () => {
 
 async function boot() {
     try {
-        const response = await fetch('kernel.wasm?t=' + new Date().getTime());
+        loadingStatus.textContent = "LOADING KERNEL.WASM...";
+        const wasmPromise = fetch('kernel.wasm?t=' + new Date().getTime());
+        const bgPromise = waitForBackground();
+
+
+        const response = await wasmPromise;
         const buffer = await response.arrayBuffer();
+
+
+        loadingStatus.textContent = "INSTANTIATING MODULE...";
         const { instance } = await WebAssembly.instantiate(buffer);
         const exports = instance.exports;
 
@@ -324,7 +348,7 @@ async function boot() {
         // Background loop
         setInterval(updateFrequentStats, 1000);
         setInterval(updateBatteryStats, 10000);
-        
+
         
         // Foreground loop
         setInterval(() => {
@@ -333,6 +357,16 @@ async function boot() {
         }, 50);
         setInterval(renderClock, 1000);
         setInterval(updateUptime, 1000);
+
+        loadingStatus.textContent = "LOADING ASSETS...";
+        await bgPromise;
+        loadingStatus.textContent = "BOOT COMPLETE.";
+        setTimeout(() => {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 500);
+        }, 500);
 
         appendToTerminal("Kernel loaded successfully.");
 

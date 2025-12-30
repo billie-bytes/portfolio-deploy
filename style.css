@@ -153,3 +153,24 @@ body {
 @keyframes blink {
     50% { opacity: 0; }
 }
+
+#loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    color: #fff;
+    font-family: 'Courier New', Courier, monospace; 
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    transition: opacity 0.5s ease-out;
+}
+
+.loading-content {
+    font-size: 14px;
+    line-height: 1.5;
+}
