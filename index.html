@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>billie-bytes@portfolio</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="main-layout grid-split-v">
+        
+        <div class="glass-panel terminal-container" id="terminal-main">
+            <div id="terminal-output">
+                <div>Welcome to BytesOS v1.6.7. Type 'help' for commands.</div>
+            </div>
+            <div class="input-line" id="input-line">
+                <span class="prompt">billie-bytes@portfolio:~$</span>
+                <input type="text" id="terminal-input" spellcheck="false" autocomplete="off" autofocus>
+            </div>
+        </div>
+
+
+        <div class="right-column">
+            
+            <div class="glass-panel status-container" id="status-panel-1" style="flex: 1; margin-bottom: 20px;">
+                <pre id="neofetch-output" class="ansi-colored"></pre>
+            </div>
+
+            <div class="bottom-row-container" style="flex: 1; display: flex; gap: 20px; min-height: 0;">
+                
+                <div class="glass-panel status-container" id="status-panel-2" style="width: fit-content; flex: 0 0 auto; display: flex; flex-direction: column;">
+                    </div>
+
+                <div class="glass-panel clock-container" id="clock-panel">
+                    <div id="digital-clock-vertical"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

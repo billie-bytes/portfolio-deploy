@@ -1,0 +1,155 @@
+:root {
+    --bg-color: #121212; /* Fallback color */
+    --glass-bg: rgba(15, 15, 20, 0.65); /* Dark semi-transparent background */
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --text-color: #97b1f1;
+    --prompt-color: #97b1f1;
+    --font-stack: 'Fira Code', 'Fira Mono', Consolas, monospace;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    height: 100vh;
+    width: 100vw;
+    background-color: var(--bg-color);
+    background-image: url('background.jpg'); 
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    font-family: var(--font-stack);
+    color: var(--text-color);
+    overflow: hidden; 
+    padding: 20px;
+}
+
+/* === LAYOUT CONTAINERS === */
+
+.grid-split-v {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    height: 100%;
+    width: 100%;
+}
+
+.right-column {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px); 
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    
+
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto; 
+    min-height: 0;
+}
+
+/* Custom Scrollbar */
+.glass-panel::-webkit-scrollbar { width: 8px; }
+.glass-panel::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+.glass-panel::-webkit-scrollbar-thumb { background: rgba(81, 81, 81, 0.3); border-radius: 4px; }
+.glass-panel::-webkit-scrollbar-thumb:hover { background: rgba(81, 81, 81, 0.6); }
+
+/* === LEFT TERMINAL === */
+.terminal-container {
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+#terminal-output {
+    flex-grow: 1;
+    white-space: pre-wrap;
+    margin-bottom: 10px;
+}
+
+.input-line {
+    display: flex;
+    align-items: center;
+    background: rgba(0,0,0,0.2);
+    padding: 5px 10px;
+    border-radius: 6px;
+    flex-shrink: 0; 
+}
+
+.prompt {
+    color: var(--prompt-color);
+    margin-right: 8px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+#terminal-input {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: inherit;
+    outline: none;
+    caret-color: var(--text-color);
+}
+
+/* === RIGHT PANEL CONTENTS === */
+
+.status-container {
+    font-size: 12px;
+}
+
+#neofetch-output {
+    font-family: inherit;
+    white-space: pre; 
+
+}
+
+.hex-grid {
+    white-space: pre; 
+}
+
+/* Clock Styling */
+.clock-container {
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+#digital-clock-vertical {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-stack);
+    font-size: 4rem; 
+    font-weight: bold;
+    line-height: 1;
+    color: var(--prompt-color); 
+    text-shadow: 0 0 10px rgba(151, 177, 241, 0.4); /* Adjusted glow to match prompt color */
+}
+
+.clock-colon {
+    animation: blink 1s step-start infinite;
+    font-size: 0.8em;
+    margin: 5px 0;
+    opacity: 0.7;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}

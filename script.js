@@ -1,0 +1,347 @@
+let memory;             // For accessing WASM memory buffer
+let get_g_input_buffer; // The specific C function to get the input pointer
+let init_system;        // C function to initialize the C backend
+const Module = {};      // The object for mapping C exports
+let batteryManager = null;
+
+// UI References
+const terminalOutputDiv = document.getElementById('terminal-output');
+const terminalInput = document.getElementById('terminal-input');
+// Reference to the specific PRE tag in the top-right panel
+const neofetchPre = document.getElementById('neofetch-output');
+
+// Terminal State (For the main interactive terminal)
+const commandHistory = [];
+let historyIndex = -1;
+
+
+const memoryPanel = document.getElementById('status-panel-2'); // Your 3rd panel
+
+
+
+
+// WASM MEMORY UTILS
+
+function readStringFromMemory(ptr) {
+    const memoryView = new Uint8Array(memory.buffer);
+    let str = '';
+    let i = ptr;
+    while (memoryView[i] !== 0) {
+        str += String.fromCharCode(memoryView[i]);
+        i++;
+    }
+    return str;
+}
+
+function writeStringToMemory(str) {
+    const ptr = get_g_input_buffer();
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str + "\0");
+    const memoryView = new Uint8Array(memory.buffer);
+    memoryView.set(bytes, ptr);
+    return ptr;
+}
+
+// COLOR PARSER
+
+function parseAnsiColors(str) {
+    let safeStr = str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+
+    const colorMap = {
+        '31': '#ff5555', 
+        '32': '#50fa7b', 
+        '33': '#f1fa8c', 
+        '34': '#bd93f9', 
+        '35': '#ffffffff',
+        '36': '#8be9fd', 
+        '90': '#6272a4',
+        '0':  'RESET'
+    };
+
+    return safeStr.replace(/\u001b\[(\d+)m/g, (match, code) => {
+        if (code === '0') {
+            return '</span>';
+        }
+        
+        const hex = colorMap[code];
+        if (hex) {
+            return `</span><span style="color: ${hex}">`;
+        }
+        
+        return '';
+    });
+}
+
+// SYSTEM STATS UPDATING
+
+function updateUptime() {
+    const uptimeMilliseconds = performance.now();
+    const uptimeSeconds = Math.floor(uptimeMilliseconds / 1000);
+    let ptr = writeStringToMemory(formatUptime(uptimeSeconds));
+    Module._set_uptime(ptr);
+}
+
+function formatUptime(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+    } else {
+        return `${seconds}s`;
+    }
+}
+
+async function initBattery() {
+    if (navigator.getBattery) {
+        batteryManager = await navigator.getBattery();
+        batteryManager.addEventListener('levelchange', updateBatteryStats);
+    }
+}
+
+function updateBatteryStats() {
+    if (batteryManager) {
+        Module._set_system_battery(Math.floor(batteryManager.level * 100));
+    }
+}
+
+function updateFrequentStats(){
+    if(window.performance && window.performance.memory){
+        Module._set_memory_usage(performance.memory.usedJSHeapSize);
+    }
+}
+
+function updateOnceStats(){
+    Module._set_window_width(window.screen.width);
+    Module._set_window_height(window.screen.height);
+    let safeUserAgent = navigator.userAgent.substring(0, 63);
+    let ptr = writeStringToMemory(safeUserAgent);
+    // Module._set_terminal(ptr);
+    if(navigator.hardwareConcurrency) Module._set_system_cores(navigator.hardwareConcurrency);
+    if(navigator.deviceMemory) Module._set_system_ram(navigator.deviceMemory);
+    writeStringToMemory(navigator.language.substring(0, 31));
+    Module._set_locale(ptr);
+}
+
+
+// ANIMATION LOOP
+
+/**
+ * @brief Continuously fetches frame from C and renders to the Top-Right panel
+ */
+function renderNeofetchLoop() {
+    const outputPtr = Module._get_frame();
+    const outputString = readStringFromMemory(outputPtr);
+    // Parse colors and set innerHTML of the top-right PRE tag
+    neofetchPre.innerHTML = parseAnsiColors(outputString);
+}
+
+function renderHexDump() {
+    const startOffset = get_hexdump_ptr(); 
+    const panelHeight = memoryPanel.clientHeight;
+    const rowHeight = 12; 
+    const availableRows = Math.floor((panelHeight - 30) / rowHeight);
+    const length = Math.max(16, availableRows * 16); 
+
+    const memoryView = new Uint8Array(memory.buffer);
+    
+    let html = '<div class="hex-grid" style="font-family: monospace; font-size: 10px; line-height: 1.15;">';
+    html += '<div style="color: #888; margin-bottom: 5px; font-weight:bold;">LIVE MEMORY DUMP</div>';
+    
+    for (let i = 0; i < length; i += 16) {
+        let rowHtml = `<span style="color: #555">0x${(startOffset + i).toString(16).padStart(4, '0').toUpperCase()}: </span>`;
+        
+        let hexPart = '';
+        let asciiPart = '';
+
+        for (let j = 0; j < 16; j++) {
+            // Safety check: Don't read past the end of memory
+            if (startOffset + i + j >= memoryView.length) break;
+
+            const byte = memoryView[startOffset + i + j];
+            
+            // Hex Coloring
+            let color = '#97b1f1'; 
+            if (byte === 0) color = '#333'; 
+            else if (byte > 32 && byte < 127) color = '#fff'; 
+            
+            hexPart += `<span style="color: ${color}">${byte.toString(16).padStart(2, '0').toUpperCase()}</span> `;
+            
+            // ASCII Representation
+            if (byte >= 32 && byte <= 126) {
+                asciiPart += String.fromCharCode(byte);
+            } else {
+                asciiPart += '.';
+            }
+        }
+        
+        rowHtml += `<span style="margin-right: 10px">${hexPart}</span>`;
+        rowHtml += `<span style="color: #aaa; border-left: 1px solid #444; padding-left: 5px;">${asciiPart}</span>`;
+        rowHtml += '<br>';
+        html += rowHtml;
+    }
+    
+    html += '</div>';
+    memoryPanel.innerHTML = html;
+}
+
+function renderClock() {
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, '0');
+    
+    const h = pad(now.getHours());
+    const m = pad(now.getMinutes());
+    const s = pad(now.getSeconds());
+    const html = `
+        <div>${h}</div>
+        <div>${m}</div>
+        <div>${s}</div>
+    `;
+
+    const clockEl = document.getElementById('digital-clock-vertical');
+    if (clockEl) clockEl.innerHTML = html;
+}
+
+
+// MAIN INTERACTIVE TERMINAL LOGIC
+
+function appendToTerminal(text, isCommand = false) {
+    const div = document.createElement('div');
+    if (isCommand) {
+         div.innerHTML = `<span class="prompt">billie-bytes@portfolio:~$</span> <span style="color: #ffffffff">${text}</span>`;
+    } else {
+         // For now, simple text. Later we will use ANSI parser here too for ls colors
+         div.textContent = text; 
+    }
+    terminalOutputDiv.appendChild(div);
+    // Auto scroll to bottom of the left panel
+    document.getElementById('terminal-main').scrollTop = terminalOutputDiv.scrollHeight;
+}
+
+async function handleCommand(cmd) {
+    const trimmedCmd = cmd.trim();
+    if (trimmedCmd.length === 0) return;
+
+    appendToTerminal(trimmedCmd, true);
+    commandHistory.push(trimmedCmd);
+    historyIndex = commandHistory.length;
+
+    if (trimmedCmd === 'clear') {
+        terminalOutputDiv.innerHTML = '';
+    } 
+    else if (Module._exec_cmd) {
+        writeStringToMemory(trimmedCmd);
+        Module._exec_cmd();
+        const outputPtr = get_g_output_buffer();
+        const outputStr = readStringFromMemory(outputPtr);
+        if(outputStr.length > 0) {
+             // Using innerHTML here allows the C backend to send <br> or ANSI later
+             const outDiv = document.createElement('div');
+             let formatted = parseAnsiColors(outputStr);
+             formatted = formatted.replace(/\n/g, '<br>');
+             // For now, just handle newlines. Later apply parseAnsiColors here.
+             outDiv.innerHTML = formatted;
+             terminalOutputDiv.appendChild(outDiv);
+        }
+    } else {
+        appendToTerminal(`Error: Kernel not loaded or exec_cmd missing.`);
+    }
+    
+    // Ensure scrolled to bottom after output
+    document.getElementById('terminal-main').scrollTop = terminalOutputDiv.scrollHeight;
+}
+
+
+terminalInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const cmd = terminalInput.value;
+        handleCommand(cmd);
+        terminalInput.value = '';
+    }
+
+    else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (historyIndex > 0) {
+            historyIndex--;
+            terminalInput.value = commandHistory[historyIndex];
+        }
+    }
+    else if (e.key === 'ArrowDown') {
+         e.preventDefault();
+         if (historyIndex < commandHistory.length - 1) {
+             historyIndex++;
+             terminalInput.value = commandHistory[historyIndex];
+         } else {
+             historyIndex = commandHistory.length;
+             terminalInput.value = '';
+         }
+    }
+});
+
+
+document.getElementById('terminal-main').addEventListener('click', () => {
+    terminalInput.focus();
+});
+
+
+async function boot() {
+    try {
+        const response = await fetch('kernel.wasm?t=' + new Date().getTime());
+        const buffer = await response.arrayBuffer();
+        const { instance } = await WebAssembly.instantiate(buffer);
+        const exports = instance.exports;
+
+        memory = exports.memory;
+        init_system = exports.init_system;
+        get_g_input_buffer = exports.get_g_input_buffer;
+        get_g_output_buffer = exports.get_g_output_buffer;
+        get_hexdump_ptr = exports.get_hexdump_ptr;
+
+
+        Module._set_window_width = exports.set_window_width;
+        Module._set_window_height = exports.set_window_height;
+        Module._set_terminal = exports.set_terminal;
+        Module._set_system_cores = exports.set_system_cores;
+        Module._set_system_ram = exports.set_system_ram;
+        Module._set_locale = exports.set_locale;
+        Module._set_memory_usage = exports.set_memory_usage;
+        Module._set_system_battery = exports.set_system_battery;
+        Module._get_frame = exports.get_frame;
+        Module._set_uptime = exports.set_uptime
+        
+
+        Module._exec_cmd = exports.exec_cmd;
+
+        // Initialize System Data
+        init_system();
+        updateOnceStats(); 
+        await initBattery();
+        updateBatteryStats();
+
+        // Background loop
+        setInterval(updateFrequentStats, 1000);
+        setInterval(updateBatteryStats, 10000);
+        
+        
+        // Foreground loop
+        setInterval(() => {
+            renderNeofetchLoop();
+            renderHexDump();
+        }, 50);
+        setInterval(renderClock, 1000);
+        setInterval(updateUptime, 1000);
+
+        appendToTerminal("Kernel loaded successfully.");
+
+    } catch (err) {
+        console.error("Boot failed:", err);
+        appendToTerminal("CRITICAL ERROR: Could not load kernel.wasm");
+    }
+}
+
+
+
+boot();
