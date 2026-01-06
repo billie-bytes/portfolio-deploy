@@ -73,6 +73,10 @@ body {
     line-height: 1.4;
 }
 
+#terminal-output::-webkit-scrollbar {
+    display: none;
+}
+
 #terminal-output {
     flex-grow: 1;
     white-space: pre-wrap;       /* Preserves /n but wraps text */
@@ -80,6 +84,9 @@ body {
     overflow-wrap: break-word;     /* Ensures it wraps even if no spaces exist */
     margin-bottom: 10px;
     overflow-x: hidden;
+
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
 }
 
 .input-line {
@@ -107,6 +114,20 @@ body {
     font-size: inherit;
     outline: none;
     caret-color: var(--text-color);
+}
+
+.terminal-link, 
+.terminal-link:visited{
+    color: inherit; /* Keep the color defined by the surrounding span */
+    text-decoration: underline;
+    text-decoration-style: dashed;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.terminal-link:hover {
+    color: #ff79c6;
+    text-decoration-style: solid;
 }
 
 /* === RIGHT PANEL CONTENTS === */

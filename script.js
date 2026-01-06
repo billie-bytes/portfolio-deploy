@@ -7,12 +7,14 @@ let batteryManager = null;
 // UI References
 const terminalOutputDiv = document.getElementById('terminal-output');
 const terminalInput = document.getElementById('terminal-input');
+const promptSpan = document.getElementById('prompt');
 // Reference to the specific PRE tag in the top-right panel
 const neofetchPre = document.getElementById('neofetch-output');
 
 // Terminal State (For the main interactive terminal)
 const commandHistory = [];
 let historyIndex = -1;
+let currentPath = "/";
 
 
 const memoryPanel = document.getElementById('status-panel-2'); // 3rd panel
@@ -24,17 +26,17 @@ const loadingStatus = document.getElementById('loading-status');
 
 // WASM MEMORY UTILS
 
+const utf8Decoder = new TextDecoder('utf-8');
 function readStringFromMemory(ptr) {
     const memoryView = new Uint8Array(memory.buffer);
-    let str = '';
-    let i = ptr;
-    while (memoryView[i] !== 0) {
-        str += String.fromCharCode(memoryView[i]);
-        i++;
+    
+    let end = ptr;
+    while (memoryView[end] !== 0) {
+        end++;
     }
-    return str;
+    const bytes = memoryView.subarray(ptr, end);
+    return utf8Decoder.decode(bytes);
 }
-
 function writeStringToMemory(str) {
     const ptr = get_g_input_buffer();
     const encoder = new TextEncoder();
@@ -44,24 +46,43 @@ function writeStringToMemory(str) {
     return ptr;
 }
 
-// COLOR PARSER
-
-function parseAnsiColors(str) {
+function parseTerminalText(str){
+    // Syntax: \u001b[L<id>m  to START
+    // Syntax: \u001b[Lem     to END
     let safeStr = str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const linkMap = {
+        'gh': 'https://github.com/billie-bytes',
+        'ln': 'https://github.com/billie-linkedin.com/in/billie-bhaskara-wibawa-288a81345',
+        'ml': 'mailto:billiebaskarawibawa101@gmail.com'
+    }
 
+    safeStr = safeStr.replace(/\u001b\[Lem/g, '</a>');
+    safeStr = safeStr.replace(/\u001b\[L(.+?)m/g, (match, id) => {
+        const url = linkMap[id];
+        if (url) {
+            return `<a href="${url}" target="_blank" class="terminal-link">`;
+        }
+        return ''; // If ID not found, remove the tag but print the text
+    });
+    
+    return parseAnsiColors(safeStr);
 
+}
+
+// COLOR PARSER
+function parseAnsiColors(str) {
     const colorMap = {
         '31': '#ff5555', 
         '32': '#50fa7b', 
         '33': '#f1fa8c', 
-        '34': '#bd93f9', 
+        '34': '#97b1f1', 
         '35': '#ffffffff',
-        '36': '#8be9fd', 
+        '36': '#be94f9ff', 
         '90': '#6272a4',
         '0':  'RESET'
     };
 
-    return safeStr.replace(/\u001b\[(\d+)m/g, (match, code) => {
+    return str.replace(/\u001b\[(\d+)m/g, (match, code) => {
         if (code === '0') {
             return '</span>';
         }
@@ -148,7 +169,7 @@ function renderNeofetchLoop() {
     const outputPtr = Module._get_frame();
     const outputString = readStringFromMemory(outputPtr);
     // Parse colors and set innerHTML of the top-right PRE tag
-    neofetchPre.innerHTML = parseAnsiColors(outputString);
+    neofetchPre.innerHTML = parseTerminalText(outputString);
 }
 
 function renderHexDump() {
@@ -235,6 +256,10 @@ function waitForClock() {
 
 // MAIN INTERACTIVE TERMINAL LOGIC
 
+function updateInputPrompt() {
+    // Updates the visual prompt next to the input box
+    promptSpan.innerHTML = `billie-bytes@portfolio:<span style="color: #bd93f9">${currentPath}</span>$`;
+}
 
 function scrollToBottom() {
     const terminalMain = document.getElementById('terminal-output');
@@ -248,9 +273,10 @@ function scrollToBottom() {
 function appendToTerminal(text, isCommand = false) {
     const div = document.createElement('div');
     if (isCommand) {
-         div.innerHTML = `<span class="prompt">billie-bytes@portfolio:~$</span> <span style="color: #ffffffff">${text}</span>`;
+         // billie-bytes@portfolio:path$
+         div.innerHTML = `
+<span class="prompt">billie-bytes@portfolio:<span style="color: #be94f9ff">${currentPath}</span>$</span> <span style="color: #ffffffff">${text}</span>`;
     } else {
-         // For now, simple text. Later we will use ANSI parser here too for ls colors
          div.textContent = text; 
     }
     terminalOutputDiv.appendChild(div);
@@ -270,14 +296,26 @@ async function handleCommand(cmd) {
         Module._exec_cmd();
         const outputPtr = get_g_output_buffer();
         const outputStr = readStringFromMemory(outputPtr);
+
+        const isCd = trimmedCmd === 'cd' || trimmedCmd.startsWith('cd ');
+
+
+
         if(outputStr.length > 0) {
-             // Using innerHTML here allows the C backend to send <br> or ANSI later
-             const outDiv = document.createElement('div');
-             let formatted = parseAnsiColors(outputStr);
-             formatted = formatted.replace(/\n/g, '<br>');
-             // For now, just handle newlines. Later apply parseAnsiColors here.
-             outDiv.innerHTML = formatted;
-             terminalOutputDiv.appendChild(outDiv);
+            if(isCd && outputStr.trim().startsWith('/')){
+                currentPath = outputStr.trim();
+                updateInputPrompt();
+            }
+            else{
+                // Using innerHTML here allows the C backend to send <br> or ANSI later
+                const outDiv = document.createElement('div');
+                let formatted = parseTerminalText(outputStr);
+                formatted = formatted.replace(/\n/g, '<br>');
+                // For now, just handle newlines. Later apply parseAnsiColors here.
+                outDiv.innerHTML = formatted;
+                terminalOutputDiv.appendChild(outDiv);
+            }
+
         }
     } else {
         appendToTerminal(`Error: Kernel not loaded or exec_cmd missing.`);
@@ -388,7 +426,7 @@ async function boot() {
             if(outputStr.length > 0) {
                 // Using innerHTML here allows the C backend to send <br> or ANSI later
                 const outDiv = document.createElement('div');
-                let formatted = parseAnsiColors(outputStr);
+                let formatted = parseTerminalText(outputStr);
                 formatted = formatted.replace(/\n/g, '<br>');
                 // For now, just handle newlines. Later apply parseAnsiColors here.
                 outDiv.innerHTML = formatted;
