@@ -235,6 +235,16 @@ function waitForClock() {
 
 // MAIN INTERACTIVE TERMINAL LOGIC
 
+
+function scrollToBottom() {
+    const terminalMain = document.getElementById('terminal-output');
+    if (!terminalMain) return;
+    setTimeout(() => {
+        terminalMain.scrollTop = terminalMain.scrollHeight;
+    }, 0);
+}
+
+
 function appendToTerminal(text, isCommand = false) {
     const div = document.createElement('div');
     if (isCommand) {
@@ -244,8 +254,7 @@ function appendToTerminal(text, isCommand = false) {
          div.textContent = text; 
     }
     terminalOutputDiv.appendChild(div);
-    // Auto scroll to bottom of the left panel
-    document.getElementById('terminal-main').scrollTop = terminalOutputDiv.scrollHeight;
+    scrollToBottom();
 }
 
 async function handleCommand(cmd) {
@@ -273,9 +282,7 @@ async function handleCommand(cmd) {
     } else {
         appendToTerminal(`Error: Kernel not loaded or exec_cmd missing.`);
     }
-    
-    // Ensure scrolled to bottom after output
-    document.getElementById('terminal-main').scrollTop = terminalOutputDiv.scrollHeight;
+    scrollToBottom();
 }
 
 
@@ -386,6 +393,7 @@ async function boot() {
                 // For now, just handle newlines. Later apply parseAnsiColors here.
                 outDiv.innerHTML = formatted;
                 terminalOutputDiv.appendChild(outDiv);
+                scrollToBottom();
             }
             
             renderNeofetchLoop();
@@ -405,8 +413,7 @@ async function boot() {
             }, 500);
         }, 500);
 
-        // appendToTerminal("Kernel loaded successfully.");
-
+        handleCommand("cat intro.txt");
     } catch (err) {
         console.error("Boot failed:", err);
         appendToTerminal("CRITICAL ERROR: Could not load kernel.wasm");
