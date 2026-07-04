@@ -53,7 +53,13 @@ function parseTerminalText(str){
     const linkMap = {
         'gh': 'https://github.com/billie-bytes',
         'ln': 'https://github.com/billie-linkedin.com/in/billie-bhaskara-wibawa-288a81345',
-        'ml': 'mailto:billiebaskarawibawa101@gmail.com'
+        'ml': 'mailto:billiebaskarawibawa101@gmail.com',
+        'os': 'https://github.com/billie-bytes/obOS',
+        'ns': 'https://github.com/billie-bytes/network-sim',
+        'ac': 'https://github.com/naufalromi/JEE-Tubes-IF2224-2026',
+        'gd': 'https://github.com/billie-bytes/GD3D',
+        'po': 'https://github.com/billie-bytes/PartlyOtomata',
+        
     }
 
     safeStr = safeStr.replace(/\u001b\[Lem/g, '</a>');
@@ -451,7 +457,7 @@ async function boot() {
             }, 500);
         }, 500);
 
-        handleCommand("cat intro.txt");
+        handleCommand("./about_me");
     } catch (err) {
         console.error("Boot failed:", err);
         appendToTerminal("CRITICAL ERROR: Could not load kernel.wasm");
